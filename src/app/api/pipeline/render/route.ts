@@ -17,13 +17,14 @@ export async function POST(req: Request) {
   if (
     !state?.resolve ||
     !state.scans ||
+    !state.retrieveReports ||
     !state.analyzeScan ||
     !state.website ||
     !state.demographics
   ) {
     return fail(
       "render",
-      "resolve, scans, analyze-scan, website, and demographics must complete first",
+      "resolve, scans, retrieve-reports, analyze-scan, website, and demographics must complete first",
       "missing_prereqs",
     );
   }

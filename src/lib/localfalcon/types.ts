@@ -64,7 +64,8 @@ export type SaveBusinessLocationData = unknown[] | Record<string, unknown>;
 
 export type ListScanReportsData = {
   count?: number;
-  next_token?: string;
+  /** API may return string or number */
+  next_token?: string | number;
   reports?: LocalFalconReportSummary[];
 };
 

@@ -6,6 +6,7 @@
 export type PipelineStepId =
   | "resolve"
   | "scans"
+  | "retrieve-reports"
   | "analyze-scan"
   | "website"
   | "demographics"
@@ -47,6 +48,17 @@ export type ScansResult = {
   reports: ScanReportStub[];
 };
 
+/** Full scan report JSON per keyword after POST /v1/reports/{report_key}/ */
+export type RetrievedScanReport = {
+  reportKey: string;
+  keyword: string;
+  payload: Record<string, unknown>;
+};
+
+export type RetrieveReportsResult = {
+  reports: RetrievedScanReport[];
+};
+
 export type AnalyzeScanResult = {
   summary: string;
 };
@@ -72,6 +84,7 @@ export type PipelineState = {
   input: PipelineInput;
   resolve?: ResolveResult;
   scans?: ScansResult;
+  retrieveReports?: RetrieveReportsResult;
   analyzeScan?: AnalyzeScanResult;
   website?: WebsiteResult;
   demographics?: DemographicsResult;
@@ -84,6 +97,7 @@ export type PipelineStepSuccess = {
   data:
     | ResolveResult
     | ScansResult
+    | RetrieveReportsResult
     | AnalyzeScanResult
     | WebsiteResult
     | DemographicsResult
@@ -102,6 +116,7 @@ export type PipelineStepResponse = PipelineStepSuccess | PipelineStepFailure;
 export const PIPELINE_STEPS: readonly PipelineStepId[] = [
   "resolve",
   "scans",
+  "retrieve-reports",
   "analyze-scan",
   "website",
   "demographics",
