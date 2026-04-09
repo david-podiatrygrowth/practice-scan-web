@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
+import { scrapeSiteForPipeline } from "@/lib/website/scrape-site";
 import type { PipelineState } from "@/lib/pipeline/types";
 import { fail } from "@/lib/pipeline/server-json";
 
 /**
- * Chunk 3: Firecrawl (or fallback) scrape. Stub markdown.
+ * Scrape practice website: Firecrawl markdown first; if unavailable or CSS-shell on fetch, retry Firecrawl or plain text from HTTP.
  */
 export async function POST(req: Request) {
   let body: { state?: PipelineState };
@@ -18,14 +19,41 @@ export async function POST(req: Request) {
     return fail("website", "resolve step must complete first", "missing_resolve");
   }
 
-  const url = state.resolve.websiteUrl ?? "https://example.com";
+  const rawUrl = state.resolve.websiteUrl?.trim();
+  if (!rawUrl) {
+    return fail(
+      "website",
+      "No website URL on the resolved listing. Add a site in Google Business Profile or run resolve with a practice that has a website.",
+      "missing_website_url",
+    );
+  }
 
-  return NextResponse.json({
-    ok: true,
-    step: "website" as const,
-    data: {
-      url,
-      markdown: `# Website (stub)\n\nScraped content for **${state.resolve.name}** would appear here.\n\nReplace this route with Firecrawl output.`,
-    },
-  });
+  let targetUrl: string;
+  try {
+    const u = new URL(rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`);
+    targetUrl = u.toString();
+  } catch {
+    return fail("website", "Website URL is not valid", "invalid_website_url");
+  }
+
+  try {
+    const { url, markdown, scrape } = await scrapeSiteForPipeline(targetUrl);
+    return NextResponse.json({
+      ok: true,
+      step: "website" as const,
+      data: {
+        url,
+        markdown,
+        scrape,
+      },
+    });
+  } catch (e) {
+    console.error("[website] scrape error:", e);
+    return fail(
+      "website",
+      e instanceof Error ? e.message : String(e),
+      "scrape_error",
+      500,
+    );
+  }
 }

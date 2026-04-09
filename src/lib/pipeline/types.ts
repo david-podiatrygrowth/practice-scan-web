@@ -63,9 +63,21 @@ export type AnalyzeScanResult = {
   summary: string;
 };
 
+/** How the website step obtained content (Firecrawl vs plain `fetch`). */
+export type WebsiteScrapeMetrics = {
+  source: "firecrawl" | "fetch";
+  /** End-to-end time for this step’s winning path (ms) */
+  totalMs: number;
+  firecrawlMs?: number;
+  fetchMs?: number;
+  httpStatus?: number;
+  note?: string;
+};
+
 export type WebsiteResult = {
   url: string;
   markdown: string;
+  scrape?: WebsiteScrapeMetrics;
 };
 
 export type DemographicsResult = {
