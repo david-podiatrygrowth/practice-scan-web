@@ -299,7 +299,7 @@ export function PipelineApp() {
       )}
 
       {phase === "done" && state?.render && (
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <button
             type="button"
             onClick={download}
@@ -307,6 +307,16 @@ export function PipelineApp() {
           >
             Download {state.render.fileName}
           </button>
+          {state.render.downloadUrl ? (
+            <a
+              href={state.render.downloadUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-300 bg-white px-4 text-sm font-medium text-blue-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-blue-400 dark:hover:bg-zinc-800"
+            >
+              Open report link
+            </a>
+          ) : null}
         </div>
       )}
 

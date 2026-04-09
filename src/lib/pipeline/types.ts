@@ -105,6 +105,8 @@ export type RenderResult = {
   mimeType: string;
   /** Base64-encoded file bytes for download */
   base64: string;
+  /** Set when `BLOB_READ_WRITE_TOKEN` is configured (Vercel Blob). */
+  downloadUrl?: string;
 };
 
 export type PipelineState = {

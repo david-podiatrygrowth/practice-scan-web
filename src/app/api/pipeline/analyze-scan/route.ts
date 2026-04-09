@@ -1,27 +1,12 @@
 import { NextResponse } from "next/server";
+import { assistantTextFromMessage } from "@/lib/anthropic/assistant-text";
 import { createAnthropicClient } from "@/lib/anthropic";
 import { AnthropicApiError } from "@/lib/anthropic/errors";
-import type { MessagesResponse } from "@/lib/anthropic/types";
 import { buildPracticeVisibilityAnalysisPrompt } from "@/lib/pipeline/build-practice-visibility-prompt";
 import { fail } from "@/lib/pipeline/server-json";
 import type { PipelineState } from "@/lib/pipeline/types";
 
 const DEFAULT_MODEL = "claude-sonnet-4-20250514";
-
-function assistantText(msg: MessagesResponse): string {
-  let out = "";
-  for (const block of msg.content ?? []) {
-    if (
-      block &&
-      typeof block === "object" &&
-      block.type === "text" &&
-      typeof (block as { text?: string }).text === "string"
-    ) {
-      out += (block as { text: string }).text;
-    }
-  }
-  return out.trim();
-}
 
 /**
  * Builds the Podiatry Growth analysis prompt from retrieved scans and sends it to Claude.
@@ -72,7 +57,7 @@ export async function POST(req: Request) {
       messages: [{ role: "user", content: prompt }],
     });
 
-    const summary = assistantText(res);
+    const summary = assistantTextFromMessage(res);
     if (!summary) {
       return fail(
         "analyze-scan",
