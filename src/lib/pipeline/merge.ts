@@ -2,6 +2,7 @@ import type {
   AnalyzeScanResult,
   PipelineState,
   PipelineStepId,
+  RadiusResult,
   ResolveResult,
   AnalyzeGbpResult,
   RetrieveScansResult,
@@ -17,6 +18,7 @@ export function mergeStepData(
   step: PipelineStepId,
   data:
     | ResolveResult
+    | RadiusResult
     | AnalyzeGbpResult
     | ScansResult
     | RetrieveScansResult
@@ -29,6 +31,8 @@ export function mergeStepData(
   switch (step) {
     case "resolve":
       return { ...state, resolve: data as ResolveResult };
+    case "radius":
+      return { ...state, radius: data as RadiusResult };
     case "analyze-gbp":
       return { ...state, analyzeGbp: data as AnalyzeGbpResult };
     case "scans":

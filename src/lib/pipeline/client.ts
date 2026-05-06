@@ -41,17 +41,18 @@ export class PipelineError extends Error {
 }
 
 /**
- * Runs each serverless chunk in order. The client holds full `PipelineState`
- * and POSTs it to every step (see SKILL / chunked pipeline).
+ * Runs selected serverless steps in order. The client POSTs accumulated
+ * `state` after each merge (chunked pipeline).
  */
-export async function runChunkedPipeline(
-  input: PipelineInput,
+export async function runPipelineSteps(
+  initialState: PipelineState,
+  steps: readonly PipelineStepId[],
   callbacks?: RunChunkedPipelineCallbacks,
 ): Promise<PipelineState> {
   const { onProgress, onStepResponse } = callbacks ?? {};
-  let state: PipelineState = { input };
+  let state = initialState;
 
-  for (const step of PIPELINE_STEPS) {
+  for (const step of steps) {
     const res = await fetch(`/api/pipeline/${step}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -93,4 +94,12 @@ export async function runChunkedPipeline(
   }
 
   return state;
+}
+
+/** Full pipeline order from {@link PIPELINE_STEPS}. */
+export async function runChunkedPipeline(
+  input: PipelineInput,
+  callbacks?: RunChunkedPipelineCallbacks,
+): Promise<PipelineState> {
+  return runPipelineSteps({ input }, PIPELINE_STEPS, callbacks);
 }

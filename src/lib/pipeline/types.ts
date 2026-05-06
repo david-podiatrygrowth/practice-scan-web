@@ -5,6 +5,7 @@
 
 export type PipelineStepId =
   | "resolve"
+  | "radius"
   | "analyze-gbp"
   | "scans"
   | "retrieve-scans"
@@ -40,6 +41,21 @@ export type AnalyzeGbpResult = {
   summary: string;
   /** Caveats e.g. thin Local Falcon payload */
   queryNotes?: string;
+};
+
+/** Scan radius recommendation from census density or manual intake. */
+export type RadiusResult = {
+  radiusMi: number;
+  method:
+    | "input_override"
+    | "census_county_density"
+    | "density_unavailable_fallback"
+    /** User adjusted miles in the UI after the radius step, before scans. */
+    | "confirmation_override";
+  /** ACS DP05 approximate population density (people / land sq mi) when available */
+  countyDensityPerSqMi?: number;
+  countyName?: string;
+  rationale: string;
 };
 
 export type ScanReportStub = {
@@ -112,6 +128,7 @@ export type RenderResult = {
 export type PipelineState = {
   input: PipelineInput;
   resolve?: ResolveResult;
+  radius?: RadiusResult;
   analyzeGbp?: AnalyzeGbpResult;
   scans?: ScansResult;
   retrieveScans?: RetrieveScansResult;
@@ -127,6 +144,7 @@ export type PipelineStepSuccess = {
   step: PipelineStepId;
   data:
     | ResolveResult
+    | RadiusResult
     | AnalyzeGbpResult
     | ScansResult
     | RetrieveScansResult
@@ -148,6 +166,7 @@ export type PipelineStepResponse = PipelineStepSuccess | PipelineStepFailure;
 
 export const PIPELINE_STEPS: readonly PipelineStepId[] = [
   "resolve",
+  "radius",
   "scans",
   "retrieve-scans",
   "analyze-gbp",

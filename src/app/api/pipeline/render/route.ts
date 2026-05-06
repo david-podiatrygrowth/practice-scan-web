@@ -37,6 +37,7 @@ export async function POST(req: Request) {
   const state = body.state;
   if (
     !state?.resolve ||
+    !state.radius ||
     !state.analyzeGbp ||
     !state.scans ||
     !state.retrieveScans ||
@@ -47,7 +48,7 @@ export async function POST(req: Request) {
   ) {
     return fail(
       "render",
-      "resolve, scans, retrieve-scans, analyze-gbp, analyze-scan, website, analyze-website, and demographics must complete first",
+      "resolve, radius, scans, retrieve-scans, analyze-gbp, analyze-scan, website, analyze-website, and demographics must complete first",
       "missing_prereqs",
     );
   }

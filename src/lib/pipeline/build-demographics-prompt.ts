@@ -17,6 +17,7 @@ export function buildDemographicsPrompt(state: PipelineState): string {
   const region = state.input.state?.trim();
   const radiusMi =
     state.scans?.scanRadiusMi ??
+    state.radius?.radiusMi ??
     state.input.radiusMi ??
     5;
 

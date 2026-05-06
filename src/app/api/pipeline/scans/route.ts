@@ -6,6 +6,7 @@ import type {
   LocalFalconRunScanGridSize,
 } from "@/lib/localfalcon/types";
 import { fail } from "@/lib/pipeline/server-json";
+import { clampRadiusMi } from "@/lib/pipeline/radius-mi";
 import type { PipelineState, ScanReportStub } from "@/lib/pipeline/types";
 
 /** Allow sequential run-scan calls to finish (adjust on your Vercel plan). */
@@ -14,11 +15,6 @@ export const maxDuration = 120;
 const DEFAULT_GRID_SIZE: LocalFalconRunScanGridSize = "5";
 
 const DEFAULT_KEYWORDS = ["podiatrist", "foot doctor"] as const;
-
-function clampRadiusMi(r: number): number {
-  if (!Number.isFinite(r) || r <= 0) return 5;
-  return Math.min(100, Math.max(0.1, r));
-}
 
 function parseOptionalMetric(v: unknown): number | undefined {
   if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -173,6 +169,9 @@ export async function POST(req: Request) {
   if (!state?.resolve) {
     return fail("scans", "resolve step must complete first", "missing_resolve");
   }
+  if (!state?.radius) {
+    return fail("scans", "radius step must complete first", "missing_radius");
+  }
 
   const { placeId, lat, lng } = state.resolve;
   if (!placeId?.trim()) {
@@ -205,11 +204,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const scanRadiusMi = clampRadiusMi(
-    state.input.radiusMi ??
-      /* fallback until Census / CITY_RADIUS wiring */
-      5,
-  );
+  const scanRadiusMi = clampRadiusMi(state.radius.radiusMi);
   const keywords = [...DEFAULT_KEYWORDS];
 
   try {
