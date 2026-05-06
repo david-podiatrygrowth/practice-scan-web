@@ -8,6 +8,8 @@ import {
   buildRenderUserPrompt,
 } from "@/lib/pipeline/build-render-prompt";
 import { overlayVisibilityTemplateFromState } from "@/lib/pipeline/overlay-visibility-template";
+import { embedMapsInRenderedDocx } from "@/lib/pipeline/embed-maps-patch-docx";
+import { fetchFirstTwoKeywordMapBuffers } from "@/lib/pipeline/fetch-scan-map-images";
 import { buildDocxFromTemplate } from "@/lib/pipeline/render-docx-template";
 import {
   extractJsonFromAssistantText,
@@ -95,9 +97,11 @@ export async function POST(req: Request) {
 
     let buffer: Buffer;
     try {
-      buffer = await buildDocxFromTemplate(content);
+      const textDocx = await buildDocxFromTemplate(content);
+      const mapBuffers = await fetchFirstTwoKeywordMapBuffers(state);
+      buffer = await embedMapsInRenderedDocx(textDocx, mapBuffers);
     } catch (e) {
-      console.error("[render] docxtemplater error:", e);
+      console.error("[render] docx render/patch error:", e);
       return fail(
         "render",
         e instanceof Error ? e.message : "DOCX generation failed",

@@ -10,6 +10,25 @@ const TEMPLATE_REL = path.join(
 );
 
 /**
+ * Legacy image-module tags → plain markers for a second pass (`embedMapsInRenderedDocx` + `docx` `patchDocument`).
+ */
+function rewriteMapPatchPlaceholders(zip: PizZip): void {
+  const docPath = "word/document.xml";
+  const f = zip.file(docPath);
+  if (!f || f.dir) return;
+  let xml = f.asText();
+  xml = xml.replace(
+    /{%kw1_map%?}/g,
+    "[[PRACTICE_SCAN_MAP_KW1]]",
+  );
+  xml = xml.replace(
+    /{%kw2_map%?}/g,
+    "[[PRACTICE_SCAN_MAP_KW2]]",
+  );
+  zip.file(docPath, xml);
+}
+
+/**
  * Word ships `{{tag}}` while docxtemplater defaults to `{tag}`; normalize XML.
  */
 function normalizeDoubleBracePlaceholders(zip: PizZip): void {
@@ -33,6 +52,7 @@ export async function buildDocxFromTemplate(
   const input = await readFile(templatePath);
 
   const zip = new PizZip(input);
+  rewriteMapPatchPlaceholders(zip);
   normalizeDoubleBracePlaceholders(zip);
 
   const doc = new Docxtemplater(zip, {
