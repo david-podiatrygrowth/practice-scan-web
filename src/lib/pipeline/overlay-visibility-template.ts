@@ -136,5 +136,7 @@ export function overlayVisibilityTemplateFromState(
     }
   }
 
+  o.swot_items = o.swot_items.slice(0, 3);
+
   return o;
 }
