@@ -3,15 +3,15 @@ import { NextResponse } from "next/server";
 import { assistantTextFromMessage } from "@/lib/anthropic/assistant-text";
 import { createAnthropicClient } from "@/lib/anthropic";
 import { AnthropicApiError } from "@/lib/anthropic/errors";
-import { buildReportDocx } from "@/lib/pipeline/build-report-docx";
 import {
   buildRenderSystemPrompt,
   buildRenderUserPrompt,
 } from "@/lib/pipeline/build-render-prompt";
-import { fetchGridImageBuffers } from "@/lib/pipeline/grid-image-url";
+import { overlayVisibilityTemplateFromState } from "@/lib/pipeline/overlay-visibility-template";
+import { buildDocxFromTemplate } from "@/lib/pipeline/render-docx-template";
 import {
   extractJsonFromAssistantText,
-  parseReportDocumentJson,
+  parseVisibilityReportTemplateJson,
 } from "@/lib/pipeline/render-report-content";
 import { fail } from "@/lib/pipeline/server-json";
 import type { PipelineState } from "@/lib/pipeline/types";
@@ -66,15 +66,12 @@ export async function POST(req: Request) {
 
   let assistantRaw: string;
   try {
-    const [msgRes, gridBuffers] = await Promise.all([
-      anthropic.createMessage({
-        model,
-        max_tokens: 16_384,
-        system,
-        messages: [{ role: "user", content: user }],
-      }),
-      fetchGridImageBuffers(state.retrieveScans.reports),
-    ]);
+    const msgRes = await anthropic.createMessage({
+      model,
+      max_tokens: 16_384,
+      system,
+      messages: [{ role: "user", content: user }],
+    });
 
     assistantRaw = assistantTextFromMessage(msgRes);
     if (!assistantRaw) {
@@ -93,8 +90,22 @@ export async function POST(req: Request) {
       );
     }
 
-    const content = parseReportDocumentJson(parsedJson);
-    const buffer = await buildReportDocx(content, gridBuffers);
+    let content = parseVisibilityReportTemplateJson(parsedJson);
+    content = overlayVisibilityTemplateFromState(content, state);
+
+    let buffer: Buffer;
+    try {
+      buffer = await buildDocxFromTemplate(content);
+    } catch (e) {
+      console.error("[render] docxtemplater error:", e);
+      return fail(
+        "render",
+        e instanceof Error ? e.message : "DOCX generation failed",
+        "docx_generation_failed",
+        500,
+      );
+    }
+
     const base64 = buffer.toString("base64");
     const fileName = `${safeReportFileBase(state.resolve.name)}_Visibility_Report.docx`;
 

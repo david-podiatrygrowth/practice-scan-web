@@ -1,0 +1,68 @@
+{
+  "practice_name": "Advanced Foot & Ankle Center, Dr. Brian Ting",
+  "doctor_name": "Dr. Brian Ting, DPM",
+  "website": "drtingfootandankle.com",
+  "location_city_state": "Moline, IL",
+  "location_address": "2101 47th St, Moline, IL 61265",
+  "market_area": "Quad Cities area",
+  "practice_city": "Moline",
+  "practice_city_income": "$55,000–$60,000",
+  "report_date": "December 2024",
+  "overall_score": "56 / 100",
+  "score_label": "Fair — Significant Room to Grow",
+  "score_website": "13 / 20",
+  "status_website": "Fair",
+  "score_gbp": "16 / 20",
+  "status_gbp": "Very Good",
+  "score_rankings": "11 / 20",
+  "status_rankings": "Fair",
+  "score_reviews": "8 / 20",
+  "status_reviews": "Needs Work",
+  "score_content": "5 / 10",
+  "status_content": "Fair",
+  "score_engagement": "3 / 10",
+  "status_engagement": "Needs Work",
+  "kw1_term": "podiatrist",
+  "kw1_avg_rank": "3.92",
+  "kw1_solv": "56%",
+  "kw1_found": "24",
+  "kw1_total": "25",
+  "kw1_pct": "96%",
+  "kw1_description": "...",
+  "kw2_term": "foot doctor",
+  "kw2_avg_rank": "3.52",
+  "kw2_solv": "60%",
+  "kw2_found": "25",
+  "kw2_total": "25",
+  "kw2_pct": "100%",
+  "kw2_description": "...",
+  "bottom_line": "...",
+  "demographic_intro": "...",
+  "demographic_conclusion": "...",
+  "swot_items": [
+    {
+      "strength_title": "...",
+      "strength_description": "...",
+      "problem_title": "...",
+      "problem_description": "..."
+    }
+  ],
+  "neighborhoods": [
+    {
+      "neighborhood_name": "Riverdale/Pleasant Valley",
+      "neighborhood_income": "$80,000–$95,000"
+    }
+  ],
+  "general_observations": [
+    {
+      "obs_title": "Established Digital Foundation",
+      "obs_description": "..."
+    }
+  ],
+  "critical_observations": [
+    {
+      "obs_title": "Review Volume Crisis",
+      "obs_description": "..."
+    }
+  ]
+}

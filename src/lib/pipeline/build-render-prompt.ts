@@ -1,50 +1,15 @@
-import { REPORT_TEMPLATE } from "@/app/api/pipeline/render/report-template";
 import { buildScoringSystemPrompt } from "@/app/api/pipeline/render/scoring-system";
 import { buildScanDataSummary } from "@/lib/pipeline/build-practice-visibility-prompt";
 import type { PipelineState } from "@/lib/pipeline/types";
+import sampleInput from "./visibility-template-sample.json";
 
 const MAX_WEBSITE_MARKDOWN = 12_000;
 
-const JSON_EXAMPLE = `{
-  "practiceName": "string",
-  "cityStateLine": "City, ST",
-  "areaDescription": "short area phrase for title block",
-  "visibilityScore": 0,
-  "scoreLabel": "e.g. Fair — Significant Room to Grow",
-  "strengths": [{ "title": "string", "body": "1–2 sentences" }],
-  "problems": [{ "title": "string", "body": "1–2 sentences" }],
-  "scanIntro": "One paragraph — same idea as template legend intro",
-  "legendGreen": "1–3 = Patients see you first",
-  "legendYellow": "4–7 = Have to scroll to find you",
-  "legendRed": "8+ = You don't show up",
-  "keywordSections": [
-    { "keyword": "must match PIPELINE_KEYWORDS order", "statsLine": "Average Rank: … | SoLV: … | Found …", "analysis": "2–3 sentences" }
-  ],
-  "bottomLine": "3–4 sentences",
-  "practiceInfo": {
-    "practiceName": "",
-    "doctorName": "",
-    "website": "",
-    "locations": "",
-    "reportDate": "human-readable date"
-  },
-  "scoreSummary": [
-    { "category": "Website Fundamentals", "score": 0, "status": "short label" },
-    { "category": "Google Business Profile", "score": 0, "status": "" },
-    { "category": "Local Search Rankings", "score": 0, "status": "" },
-    { "category": "Online Reviews", "score": 0, "status": "" },
-    { "category": "Content & SEO", "score": 0, "status": "" },
-    { "category": "Patient Engagement", "score": 0, "status": "" }
-  ],
-  "demographicsIntro": "paragraph",
-  "incomeRows": [{ "neighborhood": "", "income": "$…", "highlightPracticeRow": false }],
-  "demographicsAnalysis": "2–3 sentences",
-  "generalObservations": [{ "title": "", "body": "" }],
-  "criticalObservations": [{ "title": "", "body": "" }],
-  "ctaHeadline": "Questions about this report? Let's talk.",
-  "ctaContactLine": "jim@podiatrygrowth.com  |  podiatrygrowth.com",
-  "ctaScheduleLine": "Schedule a call: …"
-}`;
+const OUTPUT_KEYS_EXAMPLE = JSON.stringify(sampleInput, null, 2);
+
+const REPORT_GUIDE = `
+The final Word document is filled by docxtemplater from your JSON. Keys are snake_case and must match the output contract exactly. Loops: swot_items (strength + problem pairs), neighborhoods, general_observations, critical_observations (each with the field names shown in the sample). Keyword fields kw1_* and kw2_* correspond to the first and second keywords in PIPELINE_KEYWORDS_IN_ORDER. Write clear, professional prose; no HTML.
+`.trim();
 
 function collateUserContext(state: PipelineState): string {
   const wm = state.website?.markdown ?? "";
@@ -78,25 +43,26 @@ function collateUserContext(state: PipelineState): string {
 
 export function buildRenderSystemPrompt(): string {
   return [
-    "You are generating structured report content for a Practice Visibility Scan. Output must be a single JSON object only (no markdown outside JSON).",
+    "You are generating the structured JSON data for a Practice Visibility Scan Word report. Output must be a single JSON object only (no markdown outside JSON).",
     "",
-    "--- Report template (structure, tone, what to include) ---",
-    REPORT_TEMPLATE,
+    "--- Narrative & structure ---",
+    REPORT_GUIDE,
     "",
     "--- Scoring (category scores must follow this rubric and sum correctly) ---",
     buildScoringSystemPrompt(),
     "",
     "--- Output contract ---",
-    "Return ONLY valid JSON matching this shape (keys required; use empty strings or [] if needed):",
-    JSON_EXAMPLE,
+    "Return ONLY valid JSON with **every key present** in this sample (same snake_case names). Use the sample as a structural reference — replace placeholder text with real content derived from the pipeline payload:",
+    "",
+    OUTPUT_KEYS_EXAMPLE,
     "",
     "Rules:",
-    "- `keywordSections` MUST list keywords in the exact same order as `PIPELINE_KEYWORDS_IN_ORDER` in the user payload.",
-    "- Derive scores and copy from the supplied pipeline data; do not invent scan numbers that contradict the payload.",
-    "- Strengths/problems: exactly 3 items each unless data truly supports fewer (prefer 3).",
-    "- General observations: 3–4 items; critical observations: 2–3 items.",
-    "- No HTML. Escape any double quotes inside strings.",
-    "- Category scores in scoreSummary must be integers 0–max per category (20 or 10) and align with the scoring rubric.",
+    "- Do not rename keys or change nesting. Arrays may have different lengths but must use the same object shapes as the sample.",
+    "- `kw1_*` maps to PIPELINE_KEYWORDS_IN_ORDER[0], `kw2_*` to [1]. Descriptions: plain English for a practice owner.",
+    "- `overall_score` and `score_*` / `status_*` strings must match the scoring rubric (e.g. score_website like \"13 / 20\").",
+    "- swot_items: prefer 3 rows; neighborhoods: 4–6; general_observations: 3–4; critical_observations: 2–3.",
+    "- Escape double quotes inside strings. No HTML.",
+    "- `demographic_intro` / `demographic_conclusion` synthesize the demographics pipeline section; cite patterns, not fake precision.",
   ].join("\n");
 }
 
