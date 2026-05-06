@@ -1,3 +1,4 @@
+import { keywordsInPipelineOrder } from "@/lib/pipeline/pipeline-keywords";
 import type { PipelineInput, PipelineState } from "./types";
 
 const NOT_PROVIDED = "Not provided";
@@ -199,10 +200,7 @@ export function buildPracticeVisibilityPromptContext(
       ? String(scans.scanRadiusMi)
       : "5";
 
-  const keywords =
-    scans?.keywords?.length
-      ? [...scans.keywords]
-      : (state.retrieveScans?.reports.map((r) => r.keyword) ?? []);
+  const keywords = [...keywordsInPipelineOrder(state)];
 
   return {
     practiceName,

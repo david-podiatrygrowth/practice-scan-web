@@ -1,3 +1,4 @@
+import { keywordsInPipelineOrder } from "@/lib/pipeline/pipeline-keywords";
 import type { VisibilityReportTemplateData } from "@/lib/pipeline/render-report-content";
 import type { PipelineState } from "@/lib/pipeline/types";
 
@@ -60,10 +61,7 @@ export function overlayVisibilityTemplateFromState(
   state: PipelineState,
 ): VisibilityReportTemplateData {
   const resolve = state.resolve;
-  const keywords =
-    state.scans?.keywords?.length && state.scans.keywords.length > 0
-      ? state.scans.keywords
-      : (state.retrieveScans?.reports.map((r) => r.keyword) ?? []);
+  const keywords = keywordsInPipelineOrder(state);
 
   const o: VisibilityReportTemplateData = { ...data };
 

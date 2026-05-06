@@ -2,59 +2,52 @@ import { readFile } from "fs/promises";
 import path from "path";
 import Docxtemplater from "docxtemplater";
 import PizZip from "pizzip";
+import { mapPatchMarker } from "@/lib/pipeline/embed-maps-patch-docx";
 import type { VisibilityReportTemplateData } from "@/lib/pipeline/render-report-content";
 
-const TEMPLATE_REL = path.join(
+const TEMPLATE_PATH = path.join(
+  process.cwd(),
   "templates",
   "visibility_report_template.docx",
 );
 
-/**
- * Legacy image-module tags → plain markers for a second pass (`embedMapsInRenderedDocx` + `docx` `patchDocument`).
- */
-function rewriteMapPatchPlaceholders(zip: PizZip): void {
-  const docPath = "word/document.xml";
-  const f = zip.file(docPath);
-  if (!f || f.dir) return;
-  let xml = f.asText();
-  xml = xml.replace(
-    /{%kw1_map%?}/g,
-    "[[PRACTICE_SCAN_MAP_KW1]]",
-  );
-  xml = xml.replace(
-    /{%kw2_map%?}/g,
-    "[[PRACTICE_SCAN_MAP_KW2]]",
-  );
-  zip.file(docPath, xml);
+/** `{%kw1_map}` legacy tags → `patchDocument` markers (see embed-maps-patch-docx). */
+function replaceLegacyMapTags(zip: PizZip): void {
+  const pathRel = "word/document.xml";
+  const entry = zip.file(pathRel);
+  if (!entry || entry.dir) return;
+
+  let xml = entry.asText();
+
+  xml = xml.replace(/\{%kw1_map%?\}/g, mapPatchMarker("KW1"));
+  xml = xml.replace(/\{%kw2_map%?\}/g, mapPatchMarker("KW2"));
+
+  zip.file(pathRel, xml);
 }
 
 /**
- * Word ships `{{tag}}` while docxtemplater defaults to `{tag}`; normalize XML.
+ * Authoring often uses Word `{{field}}`; docxtemplater uses `{field}` unless configured otherwise.
  */
-function normalizeDoubleBracePlaceholders(zip: PizZip): void {
-  const names = Object.keys(zip.files);
-  for (const n of names) {
-    if (!n.startsWith("word/") || !n.endsWith(".xml")) continue;
-    const f = zip.file(n);
+function collapseDoubleBraceTags(zip: PizZip): void {
+  for (const name of Object.keys(zip.files)) {
+    if (!name.startsWith("word/") || !name.endsWith(".xml")) continue;
+    const f = zip.file(name);
     if (!f || f.dir) continue;
+
     let xml = f.asText();
     if (!xml.includes("{{")) continue;
+
     xml = xml.replace(/\{\{/g, "{").replace(/\}\}/g, "}");
-    zip.file(n, xml);
+    zip.file(name, xml);
   }
 }
 
-/** Build .docx from `templates/visibility_report_template.docx` and template data. */
-export async function buildDocxFromTemplate(
-  data: VisibilityReportTemplateData,
-): Promise<Buffer> {
-  const templatePath = path.join(process.cwd(), TEMPLATE_REL);
-  const input = await readFile(templatePath);
+function preprocessTemplate(zip: PizZip): void {
+  replaceLegacyMapTags(zip);
+  collapseDoubleBraceTags(zip);
+}
 
-  const zip = new PizZip(input);
-  rewriteMapPatchPlaceholders(zip);
-  normalizeDoubleBracePlaceholders(zip);
-
+function renderDoc(data: VisibilityReportTemplateData, zip: PizZip): Buffer {
   const doc = new Docxtemplater(zip, {
     paragraphLoop: true,
     linebreaks: true,
@@ -62,10 +55,20 @@ export async function buildDocxFromTemplate(
 
   doc.render(data as unknown as Record<string, unknown>);
 
-  const out = doc.getZip().generate({
+  return doc.getZip().generate({
     type: "nodebuffer",
     compression: "DEFLATE",
   }) as Buffer;
+}
 
-  return out;
+/**
+ * Fill `visibility_report_template.docx` from template JSON (maps added in a separate pass).
+ */
+export async function buildDocxFromTemplate(
+  data: VisibilityReportTemplateData,
+): Promise<Buffer> {
+  const templateBytes = await readFile(TEMPLATE_PATH);
+  const zip = new PizZip(templateBytes);
+  preprocessTemplate(zip);
+  return renderDoc(data, zip);
 }

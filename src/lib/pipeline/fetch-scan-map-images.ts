@@ -1,105 +1,93 @@
-import type { PipelineState } from "@/lib/pipeline/types";
+import { keywordsInPipelineOrder } from "@/lib/pipeline/pipeline-keywords";
+import type {
+  PipelineState,
+  RetrieveScansResult,
+  ScansResult,
+} from "@/lib/pipeline/types";
 
-const LF_STATIC_IMAGE = "https://lf-static-v2.localfalcon.com/image/";
+const LF_STATIC_IMAGE_BASE = "https://lf-static-v2.localfalcon.com/image/";
 
-function scanStubForKeyword(
-  state: PipelineState,
-  keyword: string,
-):
-  | { reportKey?: string; gridImageUrl?: string }
-  | undefined {
-  const k = keyword.trim().toLowerCase();
-  return state.scans?.reports?.find(
-    (r) => r.keyword.trim().toLowerCase() === k,
-  );
+function keywordKey(keyword: string): string {
+  return keyword.trim().toLowerCase();
 }
 
-function retrievedReportForKeyword(
-  state: PipelineState,
+function stubForKeyword(
+  scans: ScansResult | undefined,
   keyword: string,
 ) {
-  const k = keyword.trim().toLowerCase();
-  return state.retrieveScans?.reports.find(
-    (r) => r.keyword.trim().toLowerCase() === k,
-  );
+  const k = keywordKey(keyword);
+  return scans?.reports?.find((r) => keywordKey(r.keyword) === k);
+}
+
+function retrievalForKeyword(
+  retrieved: RetrieveScansResult | undefined,
+  keyword: string,
+) {
+  const k = keywordKey(keyword);
+  return retrieved?.reports.find((r) => keywordKey(r.keyword) === k);
+}
+
+function trimHttpUrl(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return /^https?:\/\//i.test(trimmed) ? trimmed : undefined;
 }
 
 /**
- * Prefer Local Falcon CDN URL from poll payload (`image`), then scans-step URL, then derived static PNG URL.
+ * Resolved in order: full report JSON (`image`, `heatmap`), scans-step preview URL,
+ * then Local Falcon static image URL using `reportKey`.
  */
 export function keywordMapImageUrl(
   state: PipelineState,
   keyword: string,
 ): string | undefined {
-  const retrieved = retrievedReportForKeyword(state, keyword);
-  const stub = scanStubForKeyword(state, keyword);
-  const payload = retrieved?.payload ?? {};
+  const report = retrievalForKeyword(state.retrieveScans, keyword);
+  const stub = stubForKeyword(state.scans, keyword);
+  const payload = report?.payload ?? {};
 
   const fromPayload =
-    typeof payload.image === "string"
-      ? payload.image.trim()
-      : typeof payload.heatmap === "string"
-        ? (payload.heatmap as string).trim()
-        : undefined;
-  if (
-    fromPayload &&
-    /^https?:\/\//i.test(fromPayload)
-  ) {
-    return fromPayload;
-  }
+    trimHttpUrl(payload.image) ?? trimHttpUrl(payload.heatmap);
+  if (fromPayload) return fromPayload;
 
-  const fromStub = stub?.gridImageUrl?.trim();
-  if (fromStub && /^https?:\/\//i.test(fromStub)) {
-    return fromStub;
-  }
+  const fromStub = trimHttpUrl(stub?.gridImageUrl);
+  if (fromStub) return fromStub;
 
-  const key = retrieved?.reportKey?.trim() ?? stub?.reportKey?.trim();
-  if (key) {
-    return `${LF_STATIC_IMAGE}${key}`;
-  }
-
-  return undefined;
+  const reportKey = report?.reportKey?.trim() ?? stub?.reportKey?.trim();
+  return reportKey ? `${LF_STATIC_IMAGE_BASE}${reportKey}` : undefined;
 }
 
-export async function fetchMapPng(
-  url: string,
-): Promise<Buffer | null> {
+export async function fetchMapPng(url: string): Promise<Buffer | null> {
+  const preview = url.length > 120 ? `${url.slice(0, 120)}…` : url;
+
   try {
     const res = await fetch(url, { redirect: "follow" });
     if (!res.ok) {
-      console.warn(
-        `[fetchMapPng] HTTP ${res.status} for ${url.slice(0, 120)}…`,
-      );
+      console.warn(`[fetchMapPng] HTTP ${res.status}: ${preview}`);
       return null;
     }
-    const ab = await res.arrayBuffer();
-    return Buffer.from(ab);
+    return Buffer.from(await res.arrayBuffer());
   } catch (e) {
-    console.warn(
-      `[fetchMapPng] ${e instanceof Error ? e.message : String(e)} — ${url.slice(0, 120)}…`,
-    );
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(`[fetchMapPng] ${msg}: ${preview}`);
     return null;
   }
 }
 
-/** First two keywords in pipeline order → map PNGs (parallel fetch). */
+/** Download map images for keyword 1 and 2 (pipeline order); missing URLs yield `null`. */
 export async function fetchFirstTwoKeywordMapBuffers(
   state: PipelineState,
 ): Promise<{ kw1: Buffer | null; kw2: Buffer | null }> {
-  const keywords =
-    state.scans?.keywords?.length && state.scans.keywords.length > 0
-      ? state.scans.keywords
-      : (state.retrieveScans?.reports.map((r) => r.keyword) ?? []);
+  const [kw1Raw, kw2Raw] = keywordsInPipelineOrder(state);
 
-  const u1 =
-    keywords[0]?.trim() ? keywordMapImageUrl(state, keywords[0]) : undefined;
-  const u2 =
-    keywords[1]?.trim() ? keywordMapImageUrl(state, keywords[1]) : undefined;
+  const url1 =
+    kw1Raw?.trim() ? keywordMapImageUrl(state, kw1Raw) : undefined;
+  const url2 =
+    kw2Raw?.trim() ? keywordMapImageUrl(state, kw2Raw) : undefined;
 
-  const [buf1, buf2] = await Promise.all([
-    u1 ? fetchMapPng(u1) : Promise.resolve(null),
-    u2 ? fetchMapPng(u2) : Promise.resolve(null),
+  const [kw1, kw2] = await Promise.all([
+    url1 ? fetchMapPng(url1) : Promise.resolve(null),
+    url2 ? fetchMapPng(url2) : Promise.resolve(null),
   ]);
 
-  return { kw1: buf1, kw2: buf2 };
+  return { kw1, kw2 };
 }

@@ -7,18 +7,22 @@ import {
   buildRenderSystemPrompt,
   buildRenderUserPrompt,
 } from "@/lib/pipeline/build-render-prompt";
-import { overlayVisibilityTemplateFromState } from "@/lib/pipeline/overlay-visibility-template";
 import { embedMapsInRenderedDocx } from "@/lib/pipeline/embed-maps-patch-docx";
 import { fetchFirstTwoKeywordMapBuffers } from "@/lib/pipeline/fetch-scan-map-images";
+import { overlayVisibilityTemplateFromState } from "@/lib/pipeline/overlay-visibility-template";
 import { buildDocxFromTemplate } from "@/lib/pipeline/render-docx-template";
 import {
   extractJsonFromAssistantText,
   parseVisibilityReportTemplateJson,
+  type VisibilityReportTemplateData,
 } from "@/lib/pipeline/render-report-content";
 import { fail } from "@/lib/pipeline/server-json";
 import type { PipelineState } from "@/lib/pipeline/types";
 
 const DEFAULT_MODEL = "claude-sonnet-4-20250514";
+
+const DOCX_MIME =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 function safeReportFileBase(name: string): string {
   const cleaned = name
@@ -26,6 +30,30 @@ function safeReportFileBase(name: string): string {
     .trim()
     .replace(/\s+/g, "_");
   return cleaned.slice(0, 80) || "Practice";
+}
+
+function hasRequiredPipelineSteps(state: PipelineState | undefined): boolean {
+  return Boolean(
+    state?.resolve &&
+      state.radius &&
+      state.analyzeGbp &&
+      state.scans &&
+      state.retrieveScans &&
+      state.analyzeScan &&
+      state.website &&
+      state.analyzeWebsite &&
+      state.demographics,
+  );
+}
+
+/** Text merge (docxtemplater) then map images (`docx` patch). */
+async function buildVisibilityDocx(
+  templateData: VisibilityReportTemplateData,
+  pipeline: PipelineState,
+): Promise<Buffer> {
+  const textOnly = await buildDocxFromTemplate(templateData);
+  const mapPngs = await fetchFirstTwoKeywordMapBuffers(pipeline);
+  return embedMapsInRenderedDocx(textOnly, mapPngs);
 }
 
 export async function POST(req: Request) {
@@ -37,17 +65,7 @@ export async function POST(req: Request) {
   }
 
   const state = body.state;
-  if (
-    !state?.resolve ||
-    !state.radius ||
-    !state.analyzeGbp ||
-    !state.scans ||
-    !state.retrieveScans ||
-    !state.analyzeScan ||
-    !state.website ||
-    !state.analyzeWebsite ||
-    !state.demographics
-  ) {
+  if (!state || !hasRequiredPipelineSteps(state)) {
     return fail(
       "render",
       "resolve, radius, scans, retrieve-scans, analyze-gbp, analyze-scan, website, analyze-website, and demographics must complete first",
@@ -59,14 +77,18 @@ export async function POST(req: Request) {
   try {
     anthropic = createAnthropicClient();
   } catch {
-    return fail("render", "ANTHROPIC_API_KEY is not configured", "missing_api_key", 500);
+    return fail(
+      "render",
+      "ANTHROPIC_API_KEY is not configured",
+      "missing_api_key",
+      500,
+    );
   }
 
   const model = process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_MODEL;
   const system = buildRenderSystemPrompt();
   const user = buildRenderUserPrompt(state);
 
-  let assistantRaw: string;
   try {
     const msgRes = await anthropic.createMessage({
       model,
@@ -75,9 +97,14 @@ export async function POST(req: Request) {
       messages: [{ role: "user", content: user }],
     });
 
-    assistantRaw = assistantTextFromMessage(msgRes);
+    const assistantRaw = assistantTextFromMessage(msgRes);
     if (!assistantRaw) {
-      return fail("render", "Model returned no text content", "empty_response", 500);
+      return fail(
+        "render",
+        "Model returned no text content",
+        "empty_response",
+        500,
+      );
     }
 
     let parsedJson: unknown;
@@ -92,14 +119,12 @@ export async function POST(req: Request) {
       );
     }
 
-    let content = parseVisibilityReportTemplateJson(parsedJson);
-    content = overlayVisibilityTemplateFromState(content, state);
+    let templateData = parseVisibilityReportTemplateJson(parsedJson);
+    templateData = overlayVisibilityTemplateFromState(templateData, state);
 
     let buffer: Buffer;
     try {
-      const textDocx = await buildDocxFromTemplate(content);
-      const mapBuffers = await fetchFirstTwoKeywordMapBuffers(state);
-      buffer = await embedMapsInRenderedDocx(textDocx, mapBuffers);
+      buffer = await buildVisibilityDocx(templateData, state);
     } catch (e) {
       console.error("[render] docx render/patch error:", e);
       return fail(
@@ -110,8 +135,8 @@ export async function POST(req: Request) {
       );
     }
 
+    const fileName = `${safeReportFileBase(state.resolve?.name ?? "Practice")}_Visibility_Report.docx`;
     const base64 = buffer.toString("base64");
-    const fileName = `${safeReportFileBase(state.resolve.name)}_Visibility_Report.docx`;
 
     let downloadUrl: string | undefined;
     const blobToken = process.env.BLOB_READ_WRITE_TOKEN?.trim();
@@ -121,8 +146,7 @@ export async function POST(req: Request) {
           access: "public",
           token: blobToken,
           addRandomSuffix: true,
-          contentType:
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          contentType: DOCX_MIME,
         });
         downloadUrl = blob.downloadUrl;
       } catch (e) {
@@ -135,8 +159,7 @@ export async function POST(req: Request) {
       step: "render" as const,
       data: {
         fileName,
-        mimeType:
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        mimeType: DOCX_MIME,
         base64,
         ...(downloadUrl ? { downloadUrl } : {}),
       },

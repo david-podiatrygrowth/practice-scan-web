@@ -1,5 +1,6 @@
 import { buildScoringSystemPrompt } from "@/app/api/pipeline/render/scoring-system";
 import { buildScanDataSummary } from "@/lib/pipeline/build-practice-visibility-prompt";
+import { keywordsInPipelineOrder } from "@/lib/pipeline/pipeline-keywords";
 import type { PipelineState } from "@/lib/pipeline/types";
 import sampleInput from "./visibility-template-sample.json";
 
@@ -18,10 +19,7 @@ function collateUserContext(state: PipelineState): string {
       ? `${wm.slice(0, MAX_WEBSITE_MARKDOWN)}\n\n[website markdown truncated]`
       : wm;
 
-  const keywords =
-    state.scans?.keywords?.length
-      ? state.scans.keywords
-      : (state.retrieveScans?.reports.map((r) => r.keyword) ?? []);
+  const keywords = keywordsInPipelineOrder(state);
 
   const payload = {
     PIPELINE_KEYWORDS_IN_ORDER: keywords,
